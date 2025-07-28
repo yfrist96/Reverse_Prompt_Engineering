@@ -552,7 +552,7 @@ if __name__ == "__main__":
         print("Consider using smaller debug_size or running on GPU for faster results.\n")
     
 
-    model_checkpoint = "/Users/yarinoh/PycharmProjects/ANLP/Final_Project/results/best_run/checkpoint-4389"
+    model_checkpoint = "/content/best_run"
     print(f"Loading best model from: {model_checkpoint}")
 
     # Look for model files in root directory (where trainer.save_model() saves them)
@@ -589,7 +589,7 @@ if __name__ == "__main__":
     # model.gradient_checkpointing_enable()
 
     # For debugging: use only a small subset (even smaller for CPU)
-    debug_size = 100 if device.type == "cpu" else 1000  # Much smaller for CPU
+    debug_size = 20 if device.type == "cpu" else 100  # Much smaller for CPU
     eval_dataset_debug = eval_dataset_clean.select(range(debug_size))
     
     # Clear memory before evaluation
