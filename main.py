@@ -26,7 +26,7 @@ if device.type == "cpu":
     print("  - Reduced batch sizes")
     print("  - Disabled gradient checkpointing")
     print("  - Using smaller models where possible")
-    
+
     # Set CPU threads for better performance
     torch.set_num_threads(4)  # Adjust based on your CPU cores
 
@@ -174,11 +174,11 @@ def safe_decode_predictions(predictions, tokenizer, skip_special_tokens=True):
 def compute_metrics(preds, labels):
     import evaluate
     results = {}
-    
+
     # Clean predictions and labels
     preds = [pred.strip() for pred in preds]
     labels = [label.strip() for label in labels]
-    
+
     print(f"Computing metrics for {len(preds)} predictions...")
 
     # BLEU
@@ -271,19 +271,19 @@ def compute_perplexity(texts, model_id="gpt2"):
         for i, text in enumerate(texts):
             if i % 20 == 0:  # Progress indicator
                 print(f"  Processing text {i+1}/{len(texts)}")
-            
+
             # Skip empty texts
             if not text.strip():
                 perplexities.append(float('inf'))
                 continue
-                
+
             encodings = tokenizer(text, return_tensors="pt", truncation=True, max_length=512).to(device)
             with torch.no_grad():
                 outputs = model(**encodings, labels=encodings["input_ids"])
                 loss = outputs.loss
                 perplexity = torch.exp(loss).item()
                 perplexities.append(perplexity)
-                
+
             # Clear GPU memory periodically
             if i % 10 == 0 and torch.cuda.is_available():
                 torch.cuda.empty_cache()
@@ -293,7 +293,7 @@ def compute_perplexity(texts, model_id="gpt2"):
         del tokenizer
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
-    
+
     return perplexities
 
 
@@ -451,106 +451,175 @@ def run_reference_free_metrics(predictions, inputs):
 
 def run_zero_or_few_shot(model_name, eval_dataset, tokenizer, shots=0):
     """
-    Runs zero-shot or few-shot inference on an evaluation dataset using a T5-like model.
-    
-    For reverse prompt engineering task:
-    - input_text: Context + Response (what we give to model)
-    - target_text: Instruction (what model should generate)
+    Clean implementation of zero-shot and few-shot evaluation for reverse prompt engineering.
 
-    In zero-shot mode (shots=0), the model receives only the input prompt.
-    In few-shot mode (shots>0), a small number of input-output examples from the dataset
-    are prepended to each input to simulate few-shot prompting.
+    Task: Given a response/output, generate the instruction/question that would produce it.
+
+    Data format:
+    - input_text: "Context: X\nResponse: Y" or just "Y" (the answer/response)
+    - target_text: "What is the instruction?" (the question we want to generate)
 
     Args:
-        model_name (str): HuggingFace model name or path (e.g., "google/flan-t5-base").
-        eval_dataset (Dataset): Evaluation dataset with "input_text" and "target_text" fields.
-        tokenizer (AutoTokenizer): A tokenizer compatible with the model.
-        shots (int): Number of few-shot examples to prepend (default is 0 = zero-shot).
+        model_name (str): HuggingFace model (e.g., "google/flan-t5-base")
+        eval_dataset: Dataset with "input_text" and "target_text" fields
+        tokenizer: Compatible tokenizer (can be None, will load fresh)
+        shots (int): Number of demonstration examples (0 = zero-shot)
 
     Returns:
-        Tuple[List[str], List[str]]:
-            - predictions (List[str]): Generated outputs for each example.
-            - references (List[str]): Ground truth outputs from the dataset.
-
-    Example:
-        preds, refs = run_zero_or_few_shot("google/flan-t5-base", eval_dataset, tokenizer, shots=3)
+        Tuple[List[str], List[str]]: (predictions, references)
     """
-    print(f"\n🎯 Running {'zero-shot' if shots == 0 else f'{shots}-shot'} evaluation...")
-    model = T5ForConditionalGeneration.from_pretrained(model_name).to(device)
-    tokenizer = AutoTokenizer.from_pretrained(model_name)
+    print(f"\n🎯 Starting {'Zero-shot' if shots == 0 else f'{shots}-shot'} Evaluation")
+    print(f"📊 Dataset size: {len(eval_dataset)} examples")
+    print(f"🤖 Model: {model_name}")
 
+    # Load model and tokenizer fresh
+    print("🔧 Loading model and tokenizer...")
+    try:
+        model = T5ForConditionalGeneration.from_pretrained(model_name)
+        model = model.to(device)
+        model.eval()
+
+        fresh_tokenizer = AutoTokenizer.from_pretrained(model_name)
+        print(f"✅ Model loaded successfully on {device}")
+    except Exception as e:
+        print(f"❌ Error loading model: {e}")
+        return [], []
+
+    # Collect demonstration examples for few-shot (if needed)
+    demo_examples = []
+    if shots > 0:
+        print(f"📝 Collecting {shots} demonstration examples...")
+        # Take first `shots` examples as demonstrations
+        for i in range(min(shots, len(eval_dataset))):
+            demo_input = eval_dataset[i]["input_text"]
+            demo_target = eval_dataset[i]["target_text"]
+            demo_examples.append({
+                "input": demo_input,
+                "output": demo_target
+            })
+        print(f"✅ Collected {len(demo_examples)} demonstrations")
+
+    # Process each example
     predictions = []
     references = []
-    
-    # Process each example individually
+
+    print("🚀 Starting inference...")
     for idx, example in enumerate(eval_dataset):
-        if idx % 5 == 0:
-            print(f"  Processing example {idx+1}/{len(eval_dataset)}")
-        
-        # Build few-shot examples (if any)
-        few_shot_examples = []
-        if shots > 0:
-            # Use different examples for few-shot (not including current one)
-            shot_indices = [i for i in range(min(shots, len(eval_dataset))) if i != idx]
-            for shot_idx in shot_indices[:shots]:
-                shot_input = eval_dataset[shot_idx]["input_text"]
-                shot_target = eval_dataset[shot_idx]["target_text"]
-                few_shot_examples.append(f"Input: {shot_input}\nOutput: {shot_target}")
-        
-        # Build the full prompt
-        if shots == 0:
-            # Zero-shot: simple instruction generation prompt
-            prompt = f"Generate instruction for: {example['input_text']}"
-        else:
-            # Few-shot: examples + current input
-            examples_text = "\n\n".join(few_shot_examples)
-            prompt = f"{examples_text}\n\nInput: {example['input_text']}\nOutput:"
-        
-        # Debug: print first few prompts
-        if idx < 3:
-            print(f"\n🔍 DEBUG - Example {idx+1} prompt:")
-            print(f"'{prompt[:200]}{'...' if len(prompt) > 200 else ''}'")
-        
+        # Progress reporting
+        if idx % 5 == 0 or idx < 5:
+            print(f"  Processing {idx+1}/{len(eval_dataset)}")
+
+        # Skip demonstration examples in few-shot to avoid data leakage
+        if shots > 0 and idx < shots:
+            print(f"  ⏭️  Skipping example {idx+1} (used as demonstration)")
+            continue
+
+        # Build the prompt
+        prompt = _build_prompt(example, demo_examples, shots)
+
+        # Show first few prompts for debugging
+        if idx < 3 or (shots > 0 and idx == shots):
+            print(f"\n🔍 Example {idx+1} Prompt:")
+            print(f"'{prompt[:150]}{'...' if len(prompt) > 150 else ''}'")
+
         # Generate prediction
-        inputs = tokenizer(prompt, return_tensors="pt", truncation=True, max_length=512).to(device)
-        with torch.no_grad():
-            outputs = model.generate(**inputs, max_new_tokens=64, do_sample=False)
-        
-        # Decode prediction (remove input tokens)
-        generated_tokens = outputs[0][inputs.input_ids.shape[1]:]
-        prediction = tokenizer.decode(generated_tokens, skip_special_tokens=True).strip()
-        
-        # Debug: print first few predictions
-        if idx < 3:
-            print(f"🎯 Prediction: '{prediction}'")
-            print(f"📝 Reference: '{example['target_text']}'")
-        
+        try:
+            prediction = _generate_prediction(model, fresh_tokenizer, prompt)
+
+            # Debug first few predictions
+            if idx < 3 or (shots > 0 and idx == shots):
+                print(f"🎯 Prediction: '{prediction}'")
+                print(f"📝 Target: '{example['target_text']}'")
+                print(f"✅ Valid: {bool(prediction.strip())}")
+
+        except Exception as e:
+            print(f"❌ Error generating prediction for example {idx+1}: {e}")
+            prediction = ""
+
         predictions.append(prediction)
         references.append(example["target_text"])
-        
-        # Clear memory periodically
-        if idx % 10 == 0 and torch.cuda.is_available():
-            torch.cuda.empty_cache()
-    
-    # Clean up model
+
+        # Memory cleanup
+        if idx % 10 == 0:
+            torch.cuda.empty_cache() if torch.cuda.is_available() else None
+
+    # Final cleanup
     del model
-    if torch.cuda.is_available():
-        torch.cuda.empty_cache()
-    
-    print(f"✅ Generated {len(predictions)} predictions")
+    del fresh_tokenizer
+    torch.cuda.empty_cache() if torch.cuda.is_available() else None
+
+    # Summary
+    valid_preds = sum(1 for p in predictions if p.strip())
+    print(f"\n📊 Evaluation Summary:")
+    print(f"  Total examples: {len(predictions)}")
+    print(f"  Valid predictions: {valid_preds}/{len(predictions)} ({valid_preds/len(predictions)*100:.1f}%)")
+    print(f"  Empty predictions: {len(predictions) - valid_preds}")
+
     return predictions, references
+
+
+def _build_prompt(example, demo_examples, shots):
+    """Build the prompt for zero-shot or few-shot inference."""
+
+    if shots == 0:
+        # Zero-shot: direct instruction format
+        return f"Generate a question for this answer: {example['input_text']}"
+
+    else:
+        # Few-shot: demonstrations + current example
+        prompt_parts = []
+
+        # Add demonstration examples
+        for demo in demo_examples:
+            prompt_parts.append(f"Answer: {demo['input']}")
+            prompt_parts.append(f"Question: {demo['output']}")
+            prompt_parts.append("")  # Empty line between examples
+
+        # Add current example
+        prompt_parts.append(f"Answer: {example['input_text']}")
+        prompt_parts.append("Question:")
+
+        return "\n".join(prompt_parts)
+
+
+def _generate_prediction(model, tokenizer, prompt):
+    """Generate a single prediction from the model."""
+
+    # Tokenize input
+    inputs = tokenizer(
+        prompt,
+        return_tensors="pt",
+        truncation=True,
+        max_length=512
+    ).to(device)
+
+    # Generate - T5 is encoder-decoder, so it generates full response, not continuation
+    with torch.no_grad():
+        outputs = model.generate(
+            inputs.input_ids,
+            max_length=64,  # Max total output length
+            do_sample=False,
+            num_beams=1,
+            pad_token_id=tokenizer.pad_token_id,
+            eos_token_id=tokenizer.eos_token_id
+        )
+
+    # For T5, the output is the complete generated sequence (not input + generated)
+    # So we just decode the full output
+    prediction = tokenizer.decode(outputs[0], skip_special_tokens=True)
+    return prediction.strip()
 import torch
 torch.cuda.empty_cache()
 
 if __name__ == "__main__":
-    
+
     # CPU Performance Warning
     if device.type == "cpu":
         print("\n⚠️  CPU PERFORMANCE WARNING ⚠️")
         print("You're running on CPU which will be significantly slower.")
         print("Expected runtime: 30-60 minutes for this debug run")
         print("Consider using smaller debug_size or running on GPU for faster results.\n")
-    
+
 
     model_checkpoint = "/content/best_run"
     print(f"Loading best model from: {model_checkpoint}")
@@ -589,13 +658,13 @@ if __name__ == "__main__":
     # model.gradient_checkpointing_enable()
 
     # For debugging: use only a small subset (even smaller for CPU)
-    debug_size = 20 if device.type == "cpu" else 100  # Much smaller for CPU
+    debug_size = 20 if device.type == "cpu" else 50  # Much smaller for CPU
     eval_dataset_debug = eval_dataset_clean.select(range(debug_size))
-    
+
     # Clear memory before evaluation
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
-    
+
     outputs = trainer.predict(eval_dataset_debug)
 
     decoded_preds = safe_decode_predictions(outputs.predictions, tokenizer)
@@ -604,7 +673,7 @@ if __name__ == "__main__":
     print("📊 Computing reference-based metrics...")
     metrics = compute_metrics(decoded_preds, decoded_labels)
     print(json.dumps(metrics, indent=2))
-    
+
     # Clear memory after reference-based metrics
     torch.cuda.empty_cache() if torch.cuda.is_available() else None
 
@@ -613,7 +682,7 @@ if __name__ == "__main__":
     decoded_inputs = safe_decode_predictions([ex["input_ids"] for ex in eval_dataset_debug_raw], tokenizer)
     ref_free_metrics = run_reference_free_metrics(decoded_preds, decoded_inputs)
     print(json.dumps(ref_free_metrics, indent=2))
-    
+
     # Clear memory after reference-free metrics
     torch.cuda.empty_cache() if torch.cuda.is_available() else None
 
@@ -621,14 +690,14 @@ if __name__ == "__main__":
     all_metrics = {**metrics, **ref_free_metrics}
 
     print("\n🚀 Running Zero-shot Evaluation...")
-    small_eval_size = 20 if device.type == "cpu" else 100  # Much smaller for CPU
+    small_eval_size = 20 if device.type == "cpu" else 50  # Much smaller for CPU
     small_eval = eval_dataset_raw.select(range(small_eval_size))
-    zero_preds, zero_refs = run_zero_or_few_shot("t5-base", small_eval, tokenizer, shots=0)
+    zero_preds, zero_refs = run_zero_or_few_shot("google/flan-t5-base", small_eval, tokenizer, shots=0)
     zero_metrics = compute_metrics(zero_preds, zero_refs)
     # zero_ref_free = run_reference_free_metrics(zero_preds, [ex["input_text"] for ex in small_eval])
-    
+
     print("\n🚀 Running Few-shot Evaluation (e.g., 3-shot)...")
-    few_preds, few_refs = run_zero_or_few_shot("t5-base", small_eval, tokenizer, shots=3)
+    few_preds, few_refs = run_zero_or_few_shot("google/flan-t5-base", small_eval, tokenizer, shots=3)
     few_metrics = compute_metrics(few_preds, few_refs)
     # few_ref_free = run_reference_free_metrics(few_preds, [ex["input_text"] for ex in small_eval])
 
@@ -644,23 +713,23 @@ if __name__ == "__main__":
             "reference_based": zero_metrics,
             # "reference_free": zero_ref_free,
             "sample_size": len(small_eval),
-            "model": "t5-base"
+            "model": "google/flan-t5-base"
         },
         "few_shot_baseline": {
-            "reference_based": few_metrics, 
+            "reference_based": few_metrics,
             # "reference_free": few_ref_free,
             "sample_size": len(small_eval),
-            "model": "t5-base",
+            "model": "google/flan-t5-base",
             "shots": 3
         }
     }
-    
+
     # Create paper-ready summary
     paper_summary = {
         "Model Performance Comparison": {
             "Fine-tuned Model": {
                 "BLEU": metrics.get("bleu", "N/A"),
-                "ROUGE-1": metrics.get("rouge1", "N/A"), 
+                "ROUGE-1": metrics.get("rouge1", "N/A"),
                 "ROUGE-L": metrics.get("rougeL", "N/A"),
                 "METEOR": metrics.get("meteor", "N/A"),
                 "BARTScore": metrics.get("bart_score", "N/A"),
@@ -670,7 +739,7 @@ if __name__ == "__main__":
             "Zero-shot Baseline": {
                 "BLEU": zero_metrics.get("bleu", "N/A"),
                 "ROUGE-1": zero_metrics.get("rouge1", "N/A"),
-                "ROUGE-L": zero_metrics.get("rougeL", "N/A"), 
+                "ROUGE-L": zero_metrics.get("rougeL", "N/A"),
                 "METEOR": zero_metrics.get("meteor", "N/A"),
                 "BARTScore": zero_metrics.get("bart_score", "N/A"),
                 # "Perplexity": zero_ref_free.get("Perplexity (avg)", "N/A"),
@@ -680,7 +749,7 @@ if __name__ == "__main__":
                 "BLEU": few_metrics.get("bleu", "N/A"),
                 "ROUGE-1": few_metrics.get("rouge1", "N/A"),
                 "ROUGE-L": few_metrics.get("rougeL", "N/A"),
-                "METEOR": few_metrics.get("meteor", "N/A"), 
+                "METEOR": few_metrics.get("meteor", "N/A"),
                 "BARTScore": few_metrics.get("bart_score", "N/A"),
                 # "Perplexity": few_ref_free.get("Perplexity (avg)", "N/A"),
                 # "Self-BLEU": few_ref_free.get("Self-BLEU", "N/A")
@@ -690,17 +759,17 @@ if __name__ == "__main__":
 
     with open("./results/eval/detailed_results.json", "w") as f:
         json.dump(detailed_results, f, indent=2)
-        
+
     with open("./results/eval/paper_summary.json", "w") as f:
         json.dump(paper_summary, f, indent=2)
-        
+
     # # Also save individual metric files for compatibility
     # with open("./results/eval/zero_shot_metrics.json", "w") as f:
     #     json.dump({**zero_metrics, **zero_ref_free}, f, indent=2)
-        
+
     # with open("./results/eval/few_shot_metrics.json", "w") as f:
     #     json.dump({**few_metrics, **few_ref_free}, f, indent=2)
-        
+
     print("\n📄 Paper-ready results saved to:")
     print("  - detailed_results.json (comprehensive)")
     print("  - paper_summary.json (table-ready)")
@@ -712,6 +781,5 @@ if __name__ == "__main__":
     }
     with open("./results/eval/summary_metrics.json", "w") as f:
         json.dump(results_summary, f, indent=2)
-        
-        
-        
+
+
