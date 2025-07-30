@@ -5,7 +5,7 @@
       "ROUGE-1": "0.5257",
       "ROUGE-L": "0.4989",
       "METEOR": "0.4728",
-      "BARTScore": "0.0000",
+      "BARTScore": "-2.667097912",
       "Perplexity": "92.6580",
       "MAUVE": "0.0077",
       "Self-BLEU": "0.5223"
@@ -15,7 +15,7 @@
       "ROUGE-1": "0.2493",
       "ROUGE-L": "0.2339",
       "METEOR": "0.1797",
-      "BARTScore": "0.0000",
+      "BARTScore": "-3.87093527",
       "Perplexity": "2797.0630",
       "MAUVE": "0.0509",
       "Self-BLEU": "0.0786"
@@ -25,7 +25,7 @@
       "ROUGE-1": "0.2639",
       "ROUGE-L": "0.2437",
       "METEOR": "0.2021",
-      "BARTScore": "0.0000",
+      "BARTScore": "-3.770641173",
       "Perplexity": "52.9779",
       "MAUVE": "0.0093",
       "Self-BLEU": "0.4824"
