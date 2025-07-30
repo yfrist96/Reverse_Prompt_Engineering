@@ -7,6 +7,8 @@ Reverse prompt prediction enhances interpretability.
 
 We fine-tune a T5-based model on the [Alpaca dataset](https://github.com/tatsu-lab/stanford_alpaca) to reconstruct prompts from completions. The project also compares **zero-shot** and **few-shot** performance baselines.
 
+📄 For more details, see our full paper [here](./paper/main.pdf).
+
 ## 📁 Project Structure
 
 ```
@@ -28,6 +30,7 @@ We fine-tune a T5-based model on the [Alpaca dataset](https://github.com/tatsu-l
 │   ├── zero-shot_bartscore_vs_length.png
 │   └── zero-shot_metric_correlation_heatmap.png
 ├── README.md
+├── from_output_to_input.pdf
 ├── requirements.txt
 ├── eval.py
 ├── plot.py
@@ -140,8 +143,8 @@ See sample visualizations in `plots/`:
 
 If you use or reference this work, please cite it as:
 
-> Ohayon, Y. (2025). *Reverse Prompt Prediction for Interpretability in Language Models*.
+> Busbib, D., Frist, Y., & Ohayon, Y. (2025). From Output to Input: Modeling the Reverse Prompt Engineering Problem.
 
 ## 📬 Contact
 
-For questions or collaboration: **@Yarin Ohayon**
+For questions or collaboration please contact as:   **david.busbib@mail.huji.ac.il**,**yehuda.frist@mail.huji.ac.il**,**yarin.ohayon@mail.huji.ac.il**
