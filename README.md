@@ -11,17 +11,28 @@ We fine-tune a T5-based model on the [Alpaca dataset](https://github.com/tatsu-l
 
 ```
 .
-├── eval/                          # Evaluation outputs and results
+├── eval/                                # Evaluation CSVs and analysis
 │   ├── few_shot_detailed_analysis.csv
 │   ├── finetuned_detailed_analysis.csv
-│   ├── paper_summary.json
-│   └── zero_shot_detailed_analysis.csv
-├── plots/                         # Generated visualizations (PNGs)
-├── eval.py                        # Evaluation logic
-├── plot.py                        # Plotting scripts
-├── train.py                       # Model training script
+│   ├── zero_shot_detailed_analysis.csv
+│   └── paper_summary.json
+├── plots/                               # Metric visualizations
+│   ├── few-shot_bartscore_boxplot.png
+│   ├── few-shot_bartscore_vs_length.png
+│   ├── few-shot_metric_correlation_heatmap.png
+│   ├── finetuned_bartscore_boxplot.png
+│   ├── finetuned_bartscore_vs_length.png
+│   ├── finetuned_metric_correlation_heatmap.png
+│   ├── metric_comparison_across_models.png
+│   ├── zero-shot_bartscore_boxplot.png
+│   ├── zero-shot_bartscore_vs_length.png
+│   └── zero-shot_metric_correlation_heatmap.png
+├── README.md
 ├── requirements.txt
-└── README.md
+├── eval.py
+├── plot.py
+├── train.py
+└── best_model.zip (hosted on Google Drive)
 ```
 
 ## 🚀 Quickstart
@@ -67,64 +78,69 @@ python -c "import nltk; nltk.download('wordnet'); nltk.download('punkt')"
 
 ## 🏋️‍♀️ Training
 
-Fine-tune the model using:
+Fine-tune the model with:
 
 ```bash
 python train.py
 ```
+Pretrained Model
+-----------------
+
+Instead of training, you can directly download the pretrained model:
+
+📎 **Download best_model.zip from Google Drive**
+
+> Replace `"your_model_link_here"` with the actual file ID.
+
+Unzip the model and point your evaluation script to its path.
 
 ## 📊 Evaluation
 
-Evaluate the model with:
+Run evaluation on each model variant using:
 
 ```bash
 python eval.py
 ```
 
-Detailed results will be saved under the `eval/` folder.
-
-## 📉 Visualization
-
-Generate plots for metric comparison and error analysis:
-
-```bash
-python plot.py
-```
-
-This will save figures to the `plots/` folder, including:
-- Metric comparison across models
-- Metric correlation heatmap
-- Input length vs. score error analysis
-
-## 🧪 Evaluation Metrics
-
-Metrics computed per model:
+Metrics are computed on a held-out test set. The following are supported:
 - BLEU
-- ROUGE-1, ROUGE-L
+- ROUGE (1, L)
 - METEOR
 - BARTScore
 - MAUVE
 - Self-BLEU
 - Perplexity
 
+## 📈 Visualization
+
+Run plotting with:
+
+```bash
+python plot.py
+```
+
+The project generates:
+- Metric comparison bar plots
+- Metric correlation heatmaps
+- Input length vs score error analysis
+
+## 🤖 Pretrained Model
+
+The fine-tuned model is available as a zip archive (`best_model.zip`) hosted on Google Drive.
+
 ## 📁 Example Output
 
-- `eval/few_shot_detailed_analysis.csv`
-- `eval/finetuned_detailed_analysis.csv`
-- `eval/zero_shot_detailed_analysis.csv`
-- Visualizations in `plots/`
+See sample visualizations in `plots/`:
+- `metric_comparison_across_models.png`
+- `*_bartscore_boxplot.png`
+- `*_bartscore_vs_length.png`
+- `*_metric_correlation_heatmap.png`
 
 ## 🤝 Citation
 
 If you use or reference this work, please cite it as:
 
 > Ohayon, Y. (2025). *Reverse Prompt Prediction for Interpretability in Language Models*.
-
-## 🛠️ TODO
-
-- [ ] Add support for larger models (e.g., T5-large)
-- [ ] Add ablation studies on prompt complexity
-- [ ] Integrate attention visualization
 
 ## 📬 Contact
 
