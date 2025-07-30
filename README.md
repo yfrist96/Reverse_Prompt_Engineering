@@ -147,4 +147,4 @@ If you use or reference this work, please cite it as:
 
 ## 📬 Contact
 
-For questions or collaboration please contact as:   **david.busbib@mail.huji.ac.il**,**yehuda.frist@mail.huji.ac.il**,**yarin.ohayon@mail.huji.ac.il**
+For questions or collaboration please contact us:   **david.busbib@mail.huji.ac.il**, **yehuda.frist@mail.huji.ac.il** ,**yarin.ohayon@mail.huji.ac.il**
