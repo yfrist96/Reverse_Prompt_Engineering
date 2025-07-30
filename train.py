@@ -14,12 +14,15 @@ import numpy as np
 from datetime import datetime
 import json
 
+# --------------------- Device Setup & Initialization ---------------------
 # Device setup
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-print(f"🚀 Using device: {device}")
+print(f"Using device: {device}")
 
 # Load tokenizer
 tokenizer = AutoTokenizer.from_pretrained("t5-base")
+# --------------------- Device Setup & Initialization ---------------------
+
 
 # Format and preprocess dataset
 def format_with_context(example):
@@ -55,30 +58,14 @@ def safe_decode_predictions(predictions, tokenizer, skip_special_tokens=True):
     predictions = np.array(predictions)
 
     if predictions.ndim == 3:
-        print("⚠️ Detected logits. Applying argmax to get token IDs.")
+        print("Detected logits. Applying argmax to get token IDs.")
         predictions = np.argmax(predictions, axis=-1)
 
     if not np.issubdtype(predictions.dtype, np.integer):
-        raise ValueError("❌ Predictions must be integer token IDs. Got float or corrupt values.")
+        raise ValueError("Predictions must be integer token IDs. Got float or corrupt values.")
 
     predictions = np.clip(predictions, 0, tokenizer.vocab_size - 1)
     return tokenizer.batch_decode(predictions.tolist(), skip_special_tokens=skip_special_tokens)
-
-# Load and prepare dataset (do this once)
-print("📊 Loading and preprocessing dataset...")
-dataset = load_dataset("tatsu-lab/alpaca")
-formatted_dataset = dataset["train"].map(format_with_context)
-tokenized_dataset = formatted_dataset.map(preprocess_function, batched=True)
-split_dataset = tokenized_dataset.train_test_split(test_size=0.1, seed=42)
-train_dataset = split_dataset["train"]
-eval_dataset = split_dataset["test"]
-
-# Prepare eval dataset for prediction
-eval_dataset_clean = eval_dataset.remove_columns(
-    [col for col in eval_dataset.column_names if col not in ["input_ids", "attention_mask", "labels"]]
-)
-
-print(f"📈 Dataset sizes - Train: {len(train_dataset)}, Eval: {len(eval_dataset)}")
 
 def train_single_config(config, run_name):
     """Train a single model configuration and return results."""
@@ -91,8 +78,8 @@ def train_single_config(config, run_name):
         reinit=True
     )
     
-    print(f"\n🚀 Starting training for: {run_name}")
-    print(f"📋 Config: {config}")
+    print(f"\nStarting training for: {run_name}")
+    print(f"Config: {config}")
     
     # Create model
     model = T5ForConditionalGeneration.from_pretrained("t5-base").to(device)
@@ -141,11 +128,11 @@ def train_single_config(config, run_name):
     train_result = trainer.train()
     
     # Evaluate on test set
-    print(f"🔍 Running evaluation for {run_name}...")
+    print(f"Running evaluation for {run_name}...")
     eval_results = trainer.evaluate()
     
     # Run predictions for sample analysis
-    print(f"🔮 Generating predictions for {run_name}...")
+    print(f"Generating predictions for {run_name}...")
     outputs = trainer.predict(eval_dataset_clean)
     
     # Decode predictions and labels
@@ -187,8 +174,8 @@ def train_single_config(config, run_name):
     with open(f"{output_dir}/results.json", "w") as f:
         json.dump(results, f, indent=2)
     
-    print(f"✅ Completed training for {run_name}")
-    print(f"📊 Train Loss: {train_result.training_loss:.4f}, Eval Loss: {eval_results['eval_loss']:.4f}")
+    print(f"Completed training for {run_name}")
+    print(f"Train Loss: {train_result.training_loss:.4f}, Eval Loss: {eval_results['eval_loss']:.4f}")
     
     # Clean up GPU memory
     del model, trainer
@@ -217,12 +204,12 @@ def run_hyperparameter_tuning():
     values = hyperparameter_grid.values()
     combinations = list(itertools.product(*values))
     
-    print(f"🎯 Total configurations to test: {len(combinations)}")
+    print(f"Total configurations to test: {len(combinations)}")
     
     # Limit combinations if too many (optional)
     max_configs = 20  # Adjust based on your resources
     if len(combinations) > max_configs:
-        print(f"⚠️ Too many combinations ({len(combinations)}). Randomly sampling {max_configs}.")
+        print(f"Too many combinations ({len(combinations)}). Randomly sampling {max_configs}.")
         import random
         random.seed(42)
         combinations = random.sample(combinations, max_configs)
@@ -239,16 +226,16 @@ def run_hyperparameter_tuning():
             all_results.append(result)
             
         except Exception as e:
-            print(f"❌ Error in {run_name}: {str(e)}")
+            print(f"Error in {run_name}: {str(e)}")
             continue
     
     # Find best configuration
     if all_results:
         best_result = min(all_results, key=lambda x: x["eval_loss"])
-        print(f"\n🏆 BEST CONFIGURATION:")
-        print(f"📊 Eval Loss: {best_result['eval_loss']:.4f}")
-        print(f"📋 Config: {best_result['config']}")
-        print(f"🏷️ Run Name: {best_result['run_name']}")
+        print(f"\nBEST CONFIGURATION:")
+        print(f"Eval Loss: {best_result['eval_loss']:.4f}")
+        print(f"Config: {best_result['config']}")
+        print(f"Run Name: {best_result['run_name']}")
         
         # Save best results
         with open("./results/best_hyperparameters.json", "w") as f:
@@ -260,24 +247,41 @@ def run_hyperparameter_tuning():
     
     return all_results
 
+# -------------------------------------- Dataset Preparation --------------------------------------
+# Load and prepare dataset (do this once)
+print("Loading and preprocessing dataset...")
+dataset = load_dataset("tatsu-lab/alpaca")
+formatted_dataset = dataset["train"].map(format_with_context)
+tokenized_dataset = formatted_dataset.map(preprocess_function, batched=True)
+split_dataset = tokenized_dataset.train_test_split(test_size=0.1, seed=42)
+train_dataset = split_dataset["train"]
+eval_dataset = split_dataset["test"]
+
+# Prepare eval dataset for prediction
+eval_dataset_clean = eval_dataset.remove_columns(
+    [col for col in eval_dataset.column_names if col not in ["input_ids", "attention_mask", "labels"]]
+)
+
+print(f"Dataset sizes - Train: {len(train_dataset)}, Eval: {len(eval_dataset)}")
+# -------------------------------------- Dataset Preparation --------------------------------------
 if __name__ == "__main__":
     # Create results directory
     os.makedirs("./results_best", exist_ok=True)
     os.makedirs("./logs__", exist_ok=True)
     
-    print("🎯 Starting hyperparameter tuning...")
+    print("Starting hyperparameter tuning...")
 
-    result =train_single_config({
-        "learning_rate": 5e-5,
-        "batch_size": 4,
-        "num_epochs": 3,
-        "weight_decay": 0.01,
-        "warmup_steps": 500,
-        "lr_scheduler_type": "cosine",
-        "gradient_accumulation_steps": 2
-    }, "best_run")
+    # result =train_single_config({
+    #     "learning_rate": 5e-5,
+    #     "batch_size": 4,
+    #     "num_epochs": 3,
+    #     "weight_decay": 0.01,
+    #     "warmup_steps": 500,
+    #     "lr_scheduler_type": "cosine",
+    #     "gradient_accumulation_steps": 2
+    # }, "best_run")
     # `results = run_hyperparameter_tuning()` is calling the function `run_hyperparameter_tuning()`
     # which is responsible for running hyperparameter tuning with multiple configurations.
-    # results = run_hyperparameter_tuning()
+    results = run_hyperparameter_tuning()
     
     print(f"✅ Hyperparameter tuning completed! Tested {len(results)} configurations.")
