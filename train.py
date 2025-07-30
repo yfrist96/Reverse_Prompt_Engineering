@@ -22,10 +22,51 @@ print(f"Using device: {device}")
 # Load tokenizer
 tokenizer = AutoTokenizer.from_pretrained("t5-base")
 # --------------------- Device Setup & Initialization ---------------------
+def is_useful(example):
+    """
+    Determine whether an Alpaca example is useful for reverse prompt prediction.
+
+    Criteria for filtering out low-quality examples:
+    - Output must contain more than 1 word, OR
+    - Output must be longer than 5 characters and not purely numeric, OR
+    - Input (context) must be non-empty
+
+    This helps remove trivial, uninformative, or extremely short examples
+    that are unlikely to help the model learn meaningful mappings.
+
+    Args:
+        example (dict): A single Alpaca dataset example with keys 'input' and 'output'.
+
+    Returns:
+        bool: True if the example is considered useful, False otherwise.
+    """
+    out = example["output"].strip()
+    inp = example["input"].strip()
+    # Filter out outputs that are too short or meaningless
+    return (
+            len(out.split()) > 1 or
+            (len(out) > 5 and not out.isnumeric()) or
+            len(inp) > 0
+    )
 
 
-# Format and preprocess dataset
 def format_with_context(example):
+    """
+    Formats a dataset example for reverse prompt prediction by creating an input-output pair.
+
+    Args:
+        example (dict): A dictionary containing the keys "instruction", "input", and "output".
+
+    Returns:
+        dict: A dictionary with:
+            - "input_text": A concatenation of the input and output fields, formatted as:
+                  "Context: <input>\nResponse: <output>"
+              If the input is empty, it defaults to just the output.
+            - "target_text": The original instruction that generated the output.
+
+    This formatting is used to train models to predict the instruction (prompt)
+    given an output and optional input (i.e., reverse prompt engineering).
+    """
     instruction = example["instruction"].strip()
     input_field = example["input"].strip()
     output_field = example["output"].strip()
@@ -251,7 +292,9 @@ def run_hyperparameter_tuning():
 # Load and prepare dataset (do this once)
 print("Loading and preprocessing dataset...")
 dataset = load_dataset("tatsu-lab/alpaca")
-formatted_dataset = dataset["train"].map(format_with_context)
+filtered_dataset = dataset.filter(is_useful)
+
+formatted_dataset = filtered_dataset["train"].map(format_with_context)
 tokenized_dataset = formatted_dataset.map(preprocess_function, batched=True)
 split_dataset = tokenized_dataset.train_test_split(test_size=0.1, seed=42)
 train_dataset = split_dataset["train"]
@@ -284,4 +327,4 @@ if __name__ == "__main__":
     # which is responsible for running hyperparameter tuning with multiple configurations.
     results = run_hyperparameter_tuning()
     
-    print(f"✅ Hyperparameter tuning completed! Tested {len(results)} configurations.")
+    print(f"Hyperparameter tuning completed! Tested {len(results)} configurations.")
