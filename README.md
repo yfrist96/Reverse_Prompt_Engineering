@@ -7,7 +7,7 @@ Reverse prompt prediction enhances interpretability.
 
 We fine-tune a T5-based model on the [Alpaca dataset](https://github.com/tatsu-lab/stanford_alpaca) to reconstruct prompts from completions. The project also compares **zero-shot** and **few-shot** performance baselines.
 
-📄 For more details, see our full paper [here](./Reverse_Prompt_Engineering/blob/main/From_output_to_input.pdf).
+📄 For more details, see our full paper [here](./main/From_output_to_input.pdf).
 
 ## 📁 Project Structure
 
