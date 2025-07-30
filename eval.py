@@ -8,7 +8,7 @@ from transformers import (
     Seq2SeqTrainingArguments,
     AutoTokenizer,
     AutoModelForSeq2SeqLM,
-    GPT2LMHeadModel,
+    GPT2LMHeadModel, 
     GPT2TokenizerFast
 )
 import torch
@@ -27,7 +27,9 @@ from nltk.translate.bleu_score import sentence_bleu, SmoothingFunction
 from rouge_score import rouge_scorer as rouge_scorer_lib
 import evaluate
 
+
 # Add the cloned directory to the system path
+# TODO: git clone https://github.com/neulab/BARTScore.git
 sys.path.append('./BARTScore')
 from bart_score import BARTScorer
 
@@ -42,20 +44,19 @@ bart_checkpoint = "facebook/bart-large-cnn"
 # Instantiate BARTScorer once
 bart_scorer = BARTScorer(
     device=device,
-    checkpoint=bart_checkpoint)
+    checkpoint = bart_checkpoint)
 
 # CPU-specific optimizations
 if device.type == "cpu":
-    print("💡 CPU detected - applying CPU optimizations:")
+    print("CPU detected - applying CPU optimizations:")
     print("  - Reduced batch sizes")
     print("  - Disabled gradient checkpointing")
     print("  - Using smaller models where possible")
 
+
 # Load tokenizer and model for our main tasks
 tokenizer = AutoTokenizer.from_pretrained("t5-base")
 DATA_DIR = "./data/alpaca_tokenized"
-
-
 # --------------------- Device Setup & Initialization ---------------------
 
 
@@ -81,9 +82,9 @@ def is_useful(example):
     inp = example["input"].strip()
     # Filter out outputs that are too short or meaningless
     return (
-            len(out.split()) > 1 or
-            (len(out) > 5 and not out.isnumeric()) or
-            len(inp) > 0
+        len(out.split()) > 1 or
+        (len(out) > 5 and not out.isnumeric()) or
+        len(inp) > 0
     )
 
 
@@ -116,10 +117,10 @@ def format_with_context(example):
     Returns:
         dict: A dictionary with:
             - "input_text": A concatenation of the input and output fields, formatted as:
-                  "Context: <input>\nResponse: <output>"
+                  "Context: <input>\nResponse: <output>" 
               If the input is empty, it defaults to just the output.
             - "target_text": The original instruction that generated the output.
-
+    
     This formatting is used to train models to predict the instruction (prompt)
     given an output and optional input (i.e., reverse prompt engineering).
     """
@@ -150,7 +151,7 @@ def safe_decode_predictions(predictions, tokenizer, skip_special_tokens=True):
 
     Raises:
         ValueError: If predictions contain non-integer types (e.g., float logits not processed via argmax).
-
+    
     Notes:
         - If logits are detected (3D array), `argmax` is applied to obtain token IDs.
         - Token IDs are clipped to valid range `[0, tokenizer.vocab_size - 1]` to avoid decode errors.
@@ -235,7 +236,7 @@ def compute_metrics(preds, labels):
     # BARTSCORE
     try:
         print("Computing BARTScore...")
-
+        
         # Filter out pairs with empty strings
         valid_pairs = [(p, l) for p, l in zip(preds, labels) if p.strip() and l.strip()]
         if not valid_pairs:
@@ -245,13 +246,13 @@ def compute_metrics(preds, labels):
             valid_preds, valid_labels = zip(*valid_pairs)
             valid_preds = list(valid_preds)
             valid_labels = list(valid_labels)
-
+            
             print(f"  Processing {len(valid_pairs)} valid pairs...")
-
-            # 💡 Let BARTScorer handle the batching internally.
+            
+            # Let BARTScorer handle the batching internally.
             # It's more efficient and the intended usage.
-            bart_scores = bart_scorer.score(valid_preds, valid_labels, batch_size=16)  # Set batch_size here
-
+            bart_scores = bart_scorer.score(valid_preds, valid_labels, batch_size=16) # Set batch_size here
+            
             avg_bart_score = np.mean(bart_scores)
             results["bart_score"] = avg_bart_score
             print(f"BARTScore: {avg_bart_score:.4f}")
@@ -259,7 +260,7 @@ def compute_metrics(preds, labels):
     except Exception as e:
         print(f"An error occurred during initial BARTScore calculation: {e}")
         print("Attempting to score one-by-one to find and skip problematic pairs...")
-
+        
         # Fallback: score one by one to isolate the issue
         scores = []
         problematic_count = 0
@@ -270,15 +271,12 @@ def compute_metrics(preds, labels):
                 scores.append(score[0])
             except Exception as single_e:
                 problematic_count += 1
-                # You can uncomment the line below to see exactly which pair failed
-                # print(f"  ⚠️ Skipping pair {i} due to error: {single_e}\n    PRED: '{pred}'\n    LABEL: '{label}'")
-                continue  # Skip this pair and continue
+                continue # Skip this pair and continue
 
         if scores:
             avg_bart_score = np.mean(scores)
             results["bart_score"] = avg_bart_score
-            print(
-                f"BARTScore (fallback): {avg_bart_score:.4f} (calculated from {len(scores)} pairs, skipped {problematic_count})")
+            print(f"BARTScore (fallback): {avg_bart_score:.4f} (calculated from {len(scores)} pairs, skipped {problematic_count})")
         else:
             print("BARTScore could not be computed for any pair.")
             results["bart_score"] = None
@@ -308,9 +306,6 @@ def compute_perplexity(texts, model_id="gpt2"):
     perplexities = []
     try:
         for i, text in enumerate(texts):
-            if i % 20 == 0:  # Progress indicator
-                print(f"  Processing text {i + 1}/{len(texts)}")
-
             # Skip empty texts
             if not text.strip():
                 perplexities.append(float('inf'))
@@ -338,7 +333,7 @@ def compute_perplexity(texts, model_id="gpt2"):
     return valid_perplexities
 
 
-# TODO - pip install mauve-text
+#TODO - pip install mauve-text
 def compute_mauve(p_texts, q_texts, device_id=0):
     """
     Compute MAUVE score between model predictions and input prompts.
@@ -373,7 +368,7 @@ def compute_self_bleu(generations):
     """
     scores = []
     for i, candidate in enumerate(generations):
-        references = generations[:i] + generations[i + 1:]
+        references = generations[:i] + generations[i+1:]
         ref_tokens = [ref.split() for ref in references]
         cand_tokens = candidate.split()
         scores.append(sentence_bleu(ref_tokens, cand_tokens))
@@ -471,8 +466,7 @@ def run_zero_or_few_shot(model_name, eval_dataset, tokenizer, shots=0, demo_exam
         print(f"Error loading model: {e}")
         return [], []
 
-    # Collect demonstration examples for few-shot (if needed)
-    # demo_examples = []
+
     if shots > 0:
         if demo_examples is None:
             raise ValueError("For few-shot, demo_examples must be provided.")
@@ -485,17 +479,13 @@ def run_zero_or_few_shot(model_name, eval_dataset, tokenizer, shots=0, demo_exam
 
     print("Starting inference...")
     for idx, example in enumerate(tqdm(eval_dataset, desc=f"Running {model_name}")):
-        # Progress reporting
-        if idx % 5 == 0 or idx < 5:
-            print(f"  Processing {idx + 1}/{len(eval_dataset)}")
-
         # Build the prompt
         prompt = _build_prompt(example, demo_examples, shots)
         prompts.append(prompt)
 
         # Show first few prompts for debugging
         if idx < 3 or (shots > 0 and idx == shots):
-            print(f"\n🔍 Example {idx + 1} Prompt:")
+            print(f"\nExample {idx+1} Prompt:")
             print(f"'{prompt[:150]}{'...' if len(prompt) > 150 else ''}'")
 
         # Generate prediction
@@ -509,7 +499,7 @@ def run_zero_or_few_shot(model_name, eval_dataset, tokenizer, shots=0, demo_exam
                 print(f"Valid: {bool(prediction.strip())}")
 
         except Exception as e:
-            print(f"Error generating prediction for example {idx + 1}: {e}")
+            print(f"Error generating prediction for example {idx+1}: {e}")
             prediction = ""
 
         predictions.append(prediction)
@@ -528,7 +518,7 @@ def run_zero_or_few_shot(model_name, eval_dataset, tokenizer, shots=0, demo_exam
     valid_preds = sum(1 for p in predictions if p.strip())
     print(f"\nEvaluation Summary:")
     print(f"  Total examples: {len(predictions)}")
-    print(f"  Valid predictions: {valid_preds}/{len(predictions)} ({valid_preds / len(predictions) * 100:.1f}%)")
+    print(f"  Valid predictions: {valid_preds}/{len(predictions)} ({valid_preds/len(predictions)*100:.1f}%)")
     print(f"  Empty predictions: {len(predictions) - valid_preds}")
 
     return predictions, references, prompts
@@ -539,7 +529,6 @@ def _build_prompt(example, demo_examples, shots):
 
     if shots == 0:
         # Zero-shot: direct instruction format
-        # return f"Generate a question for this answer: {example['input_text']}"
         return f"Given this output, what prompt likely generated it?\n\nOutput: {example['input_text']}\nPrompt:"
 
 
@@ -580,7 +569,7 @@ def _generate_prediction(model, tokenizer, prompt):
             pad_token_id=tokenizer.pad_token_id,
             max_length=128,  # Increased max length slightly
             num_beams=4,  # Use beam search
-            early_stopping=True,  # Stop when beams converge
+            early_stopping=True, # Stop when beams converge
         )
 
     # For T5, the output is the complete generated sequence (not input + generated)
@@ -619,7 +608,7 @@ def run_full_analysis(model_name, decoded_inputs, decoded_preds, decoded_labels,
     ]
     valid_preds = [decoded_preds[i] for i in valid_indices]
     valid_labels = [decoded_labels[i] for i in valid_indices]
-
+    
     # Initialize a list to hold all scores, with 0.0 for invalid pairs
     all_bart_scores = [0.0] * len(decoded_preds)
     if valid_preds:
@@ -643,22 +632,20 @@ def run_full_analysis(model_name, decoded_inputs, decoded_preds, decoded_labels,
         model_prompts = ["N/A"] * len(decoded_preds)
     # --- 3. Loop through each sample and calculate metrics ---
     print("  Calculating per-sample metrics (BLEU, ROUGE, METEOR)...")
-    for i, (inp, pred, label, prompt_text) in enumerate(
-            tqdm(zip(decoded_inputs, decoded_preds, decoded_labels, model_prompts), total=len(decoded_preds),
-                 desc="Analyzing samples")):
+    for i, (inp, pred, label, prompt_text) in enumerate(tqdm(zip(decoded_inputs, decoded_preds, decoded_labels, model_prompts), total=len(decoded_preds), desc="Analyzing samples")):
         pred = decoded_preds[i].strip()
         label = decoded_labels[i].strip()
-
+        
         # Some metrics require non-empty strings
         if not pred or not label:
             continue
 
         # BLEU with smoothing
         bleu_score = sentence_bleu([label.split()], pred.split(), smoothing_function=smoothing_fn)
-
+        
         # ROUGE
         rouge_results = rouge_calc.score(label, pred)
-
+        
         # METEOR
         meteor_score = meteor_calc.compute(predictions=[pred], references=[label])['meteor']
 
@@ -673,14 +660,14 @@ def run_full_analysis(model_name, decoded_inputs, decoded_preds, decoded_labels,
             'meteor': meteor_score,
             'bart_score': all_bart_scores[i]
         })
-
+        
     if not results_data:
         print("No valid results were generated to save.")
         return {}, None
-
+        
     # --- 4. Convert to DataFrame, calculate aggregates, and save ---
     df = pd.DataFrame(results_data)
-
+    
     # Calculate aggregate metrics by averaging the per-sample scores
     aggregate_metrics = {
         'bleu': df['bleu'].mean(),
@@ -690,17 +677,15 @@ def run_full_analysis(model_name, decoded_inputs, decoded_preds, decoded_labels,
         # For BARTScore, only average the non-zero scores
         'bart_score': df[df['bart_score'] > 0]['bart_score'].mean() if not df[df['bart_score'] > 0].empty else 0.0
     }
-
+    
     print("\nAggregate Metrics (from per-sample analysis):")
     print(json.dumps(aggregate_metrics, indent=2))
-
+    
     # Save the detailed DataFrame to a CSV file
     df.to_csv(output_filename, index=False, encoding='utf-8')
     print(f"Detailed analysis saved to '{output_filename}'")
-
+    
     return aggregate_metrics, df
-
-
 # -------------------------------------- Dataset Preparation --------------------------------------
 #
 # 1) Load & format the RAW Alpaca once
@@ -709,32 +694,33 @@ raw = load_dataset("tatsu-lab/alpaca", split="train")
 filtered_raw = raw.filter(is_useful)
 
 formatted = filtered_raw.map(format_with_context,
-                             remove_columns=["instruction", "input", "output"])
+                    remove_columns=["instruction","input","output"])
 
 print(f"Original size: {len(raw)}, Filtered size: {len(filtered_raw)}")
+
 
 #
 # 2) Split the _formatted_ into train/test
 #
 split_formatted = formatted.train_test_split(test_size=0.1, seed=42)
-train_formatted = split_formatted["train"]  # has input_text & target_text
-eval_formatted = split_formatted["test"]  # has input_text & target_text
+train_formatted = split_formatted["train"]   # has input_text & target_text
+eval_formatted  = split_formatted["test"]    # has input_text & target_text
 
 #
 # 3) Tokenize _those same_ splits (and drop the text columns)
 #
 train_tokenized = train_formatted.map(
     preprocess_fn, batched=True,
-    remove_columns=["input_text", "target_text"]
+    remove_columns=["input_text","target_text"]
 )
-eval_tokenized = eval_formatted.map(
+eval_tokenized  = eval_formatted.map(
     preprocess_fn, batched=True,
-    remove_columns=["input_text", "target_text"]
+    remove_columns=["input_text","target_text"]
 )
 
 tokenized_dataset = DatasetDict({
     "train": train_tokenized,
-    "test": eval_tokenized
+    "test" : eval_tokenized
 })
 
 # cache to disk so you don’t pay the tokenization cost again
@@ -754,7 +740,7 @@ eval_dataset = tokenized_dataset["test"]
 # this one is only for Trainer.predict:
 eval_dataset_clean = eval_dataset.remove_columns(
     [c for c in eval_dataset.column_names
-     if c not in ["input_ids", "attention_mask", "labels"]]
+     if c not in ["input_ids","attention_mask","labels"]]
 )
 
 # this raw/textual one is for your zero/few‐shot routine:
@@ -768,7 +754,7 @@ print(f"Train size: {len(train_dataset)}, Eval size: {len(eval_dataset)}")
 
 
 # -------------------------------------- NLTK setup --------------------------------------
-# TODO - pip install nltk
+#TODO - pip install nltk
 # Handle SSL certificate issues on macOS
 try:
     _create_unverified_https_context = ssl._create_unverified_context
@@ -815,7 +801,6 @@ except LookupError:
         print(f"Failed to download omw-1.4: {e}")
 
 from nltk.translate.bleu_score import sentence_bleu
-
 # -------------------------------------- NLTK setup --------------------------------------
 
 
@@ -825,8 +810,7 @@ if __name__ == "__main__":
 
     # 1. Select 3 diverse, high-quality examples from the TRAINING data
     # This avoids any data leakage from the evaluation set.
-    fixed_demo_examples = [{"input": eval_dataset_raw[i]["input_text"], "output": eval_dataset_raw[i]["target_text"]}
-                           for i in [0, 10, 30]]
+    fixed_demo_examples = [{"input": eval_dataset_raw[i]["input_text"], "output": eval_dataset_raw[i]["target_text"]} for i in [0, 10, 30]]
 
     # CPU Performance Warning
     if device.type == "cpu":
@@ -835,7 +819,8 @@ if __name__ == "__main__":
         print("Expected runtime: 30-60 minutes for this debug run")
         print("Consider using smaller debug_size or running on GPU for faster results.\n")
 
-    model_checkpoint = "/Users/yarinoh/PycharmProjects/ANLP/Final_Project/results/best_run"
+
+    model_checkpoint = "results/best_run"
     print(f"Loading best model from: {model_checkpoint}")
 
     # Look for model files in root directory (where trainer.save_model() saves them)
@@ -878,20 +863,15 @@ if __name__ == "__main__":
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
 
-    outputs = trainer.predict(eval_dataset_clean)
-
-    decoded_preds = safe_decode_predictions(outputs.predictions, tokenizer)
-    decoded_labels = safe_decode_predictions(outputs.label_ids, tokenizer)
-
     # --- Analysis for Fine-Tuned Model ---
-    print("\n" + "=" * 50)
+    print("\n" + "="*50)
     print("RUNNING ANALYSIS FOR FINE-TUNED MODEL")
-    print("=" * 50)
+    print("="*50)
     # Get predictions using the trainer
     debug_size = 500 if device.type == "cpu" else 1000
     # eval_dataset_debug = eval_dataset_clean.select(range(debug_size))
     outputs = trainer.predict(eval_dataset_clean)
-
+    
     # Decode predictions, labels, and inputs
     decoded_preds = safe_decode_predictions(outputs.predictions, tokenizer)
     decoded_labels = safe_decode_predictions(outputs.label_ids, tokenizer)
@@ -907,13 +887,13 @@ if __name__ == "__main__":
     )
 
     # --- Analysis for Zero-Shot Baseline ---
-    print("\n" + "=" * 50)
+    print("\n" + "="*50)
     print("RUNNING ANALYSIS FOR ZERO-SHOT BASELINE")
-    print("=" * 50)
+    print("="*50)
     small_eval_size = 500 if device.type == "cpu" else 1000
     small_eval = eval_dataset_raw.select(range(small_eval_size))
     zero_preds, zero_refs, zero_prompts = run_zero_or_few_shot("google/flan-t5-base", small_eval, tokenizer, shots=0)
-
+    
     zero_metrics, _ = run_full_analysis(
         model_name="zero-shot",
         decoded_inputs=[ex["input_text"] for ex in small_eval],
@@ -924,9 +904,9 @@ if __name__ == "__main__":
     )
 
     # --- Analysis for Few-Shot Baseline ---
-    print("\n" + "=" * 50)
+    print("\n" + "="*50)
     print("RUNNING ANALYSIS FOR FEW-SHOT BASELINE")
-    print("=" * 50)
+    print("="*50)
     few_preds, few_refs, few_prompts = run_zero_or_few_shot(
         "google/flan-t5-base",
         small_eval,
@@ -934,7 +914,7 @@ if __name__ == "__main__":
         shots=3,
         demo_examples=fixed_demo_examples
     )
-
+    
     few_metrics, _ = run_full_analysis(
         model_name="few-shot",
         decoded_inputs=[ex["input_text"] for ex in small_eval],
@@ -944,16 +924,14 @@ if __name__ == "__main__":
         model_prompts=few_prompts
     )
 
-    # --- (You can now update your paper_summary.json creation using the new metric dicts) ---
-
     # --- Re-run Reference-Free Metrics for Summary Files ---
     # The new analysis function focuses on per-sample reference-based metrics.
     # We can run your original reference-free function to get those aggregates back.
-
-    print("\n" + "=" * 50)
+    
+    print("\n" + "="*50)
     print("GATHERING REFERENCE-FREE METRICS FOR SUMMARIES")
-    print("=" * 50)
-
+    print("="*50)
+    
     # For fine-tuned model
     print("  Calculating reference-free metrics for Fine-Tuned model...")
     finetuned_ref_free_metrics = run_reference_free_metrics(decoded_preds, decoded_inputs)
@@ -969,10 +947,11 @@ if __name__ == "__main__":
     few_ref_free_metrics = run_reference_free_metrics(few_preds, [ex["input_text"] for ex in small_eval])
     all_few_shot_metrics = {**few_metrics, **few_ref_free_metrics}
 
+
     # --- Create and Save Final JSON Summary Files ---
-    print("\n" + "=" * 50)
+    print("\n" + "="*50)
     print("CREATING AND SAVING FINAL JSON SUMMARIES")
-    print("=" * 50)
+    print("="*50)
 
     # 1. Create the detailed summary dictionary
     detailed_results = {
@@ -994,7 +973,6 @@ if __name__ == "__main__":
         }
     }
 
-
     # Helper function to format the metrics for the paper summary
     def get_metrics_for_summary(metrics_dict):
         return {
@@ -1008,7 +986,6 @@ if __name__ == "__main__":
             "Self-BLEU": metrics_dict.get("Self-BLEU")
         }
 
-
     # 2. Create the paper-ready summary table
     paper_summary = {
         "Model Performance Comparison": {
@@ -1017,8 +994,7 @@ if __name__ == "__main__":
             "Few-shot Baseline": get_metrics_for_summary(all_few_shot_metrics)
         }
     }
-
-
+    
     # Format numbers to 4 decimal places for cleaner output
     def format_dict_numbers(d):
         if isinstance(d, dict):
@@ -1027,12 +1003,8 @@ if __name__ == "__main__":
             return f"{d:.4f}"
         return d
 
-
-    # 3. Save the files
-    try:
-        with open("./results/eval/detailed_results.json", "w") as f:
-            json.dump(detailed_results, f, indent=2)
-
+    # 3. Save the file
+    try:        
         with open("./results/eval/paper_summary.json", "w") as f:
             # Save the formatted version for easy copy-pasting into a paper
             json.dump(format_dict_numbers(paper_summary), f, indent=2)
