@@ -1,0 +1,14 @@
+{
+  "config": {
+    "learning_rate": 5e-05,
+    "batch_size": 4,
+    "num_epochs": 3,
+    "weight_decay": 0.01,
+    "warmup_steps": 500,
+    "lr_scheduler_type": "cosine",
+    "gradient_accumulation_steps": 2
+  },
+  "train_loss": 1.551838794637851,
+  "eval_loss": 1.3173398971557617,
+  "run_name": "run_014_20250722_190611"
+}
