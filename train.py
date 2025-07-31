@@ -314,15 +314,6 @@ if __name__ == "__main__":
     
     print("Starting hyperparameter tuning...")
 
-    # result =train_single_config({
-    #     "learning_rate": 5e-5,
-    #     "batch_size": 4,
-    #     "num_epochs": 3,
-    #     "weight_decay": 0.01,
-    #     "warmup_steps": 500,
-    #     "lr_scheduler_type": "cosine",
-    #     "gradient_accumulation_steps": 2
-    # }, "best_run")
     # `results = run_hyperparameter_tuning()` is calling the function `run_hyperparameter_tuning()`
     # which is responsible for running hyperparameter tuning with multiple configurations.
     results = run_hyperparameter_tuning()
