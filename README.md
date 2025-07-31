@@ -18,17 +18,17 @@ We fine-tune a T5-based model on the [Alpaca dataset](https://github.com/tatsu-l
 │   ├── finetuned_detailed_analysis.csv
 │   ├── zero_shot_detailed_analysis.csv
 │   └── paper_summary.json
-├── plots/                               # Metric visualizations
-│   ├── few-shot_bartscore_boxplot.png
-│   ├── few-shot_bartscore_vs_length.png
-│   ├── few-shot_metric_correlation_heatmap.png
-│   ├── finetuned_bartscore_boxplot.png
-│   ├── finetuned_bartscore_vs_length.png
-│   ├── finetuned_metric_correlation_heatmap.png
-│   ├── metric_comparison_across_models.png
-│   ├── zero-shot_bartscore_boxplot.png
-│   ├── zero-shot_bartscore_vs_length.png
-│   └── zero-shot_metric_correlation_heatmap.png
+    ├── plots/                               # Metric visualizations
+    │   ├── few-shot_bartscore_boxplot.png
+    │   ├── few-shot_bartscore_vs_length.png
+    │   ├── few-shot_metric_correlation_heatmap.png
+    │   ├── finetuned_bartscore_boxplot.png
+    │   ├── finetuned_bartscore_vs_length.png
+    │   ├── finetuned_metric_correlation_heatmap.png
+    │   ├── metric_comparison_across_models.png
+    │   ├── zero-shot_bartscore_boxplot.png
+    │   ├── zero-shot_bartscore_vs_length.png
+    │   └── zero-shot_metric_correlation_heatmap.png
 ├── README.md
 ├── from_output_to_input.pdf
 ├── requirements.txt
