@@ -5,6 +5,11 @@ Given a model’s output (e.g., a completion), can we reconstruct the original p
 
 Reverse prompt prediction enhances interpretability.
 
+<p align="center">
+  <img src="src.png" alt="Reverse Prompt Engineering Illustration" width="500"/>
+</p>
+
+
 We fine-tune a T5-based model on the [Alpaca dataset](https://github.com/tatsu-lab/stanford_alpaca) to reconstruct prompts from completions. The project also compares **zero-shot** and **few-shot** performance baselines.
 
 📄 For more details, see our full paper [here](./From_Output_to_Input.pdf).
