@@ -140,7 +140,7 @@ See sample visualizations in `plots/`:
 
 If you use or reference this work, please cite it as:
 
-> Busbib, D., Frist, Y., & Ohayon, Y. (2025). From Output to Input: Modeling the Reverse Prompt Engineering Problem.
+> Busbib D., Frist Y., Ohayon Y. (2025). From Output to Input: Modeling the Reverse Prompt Engineering Problem.
 
 ## 📬 Contact
 
