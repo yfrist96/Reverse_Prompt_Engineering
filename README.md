@@ -86,16 +86,6 @@ Fine-tune the model with:
 ```bash
 python train.py
 ```
-Pretrained Model
------------------
-
-Instead of training, you can directly download the pretrained model:
-
-📎 **Download best_model.zip from Google Drive**
-
-> Replace `"your_model_link_here"` with the actual file ID.
-
-Unzip the model and point your evaluation script to its path.
 
 ## 📊 Evaluation
 
@@ -129,7 +119,8 @@ The project generates:
 
 ## 🤖 Pretrained Model
 
-The fine-tuned model is available as a zip archive (`best_model.zip`) hosted on Google Drive.
+The fine-tuned [model](https://drive.google.com/drive/folders/1mIbl2XGp1J6JDURod3OMl9DPxGVRk5VK?usp=sharing)
+ is available as a zip archive (`best_run.zip`) hosted on Google Drive.
 
 ## 📁 Example Output
 
